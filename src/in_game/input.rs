@@ -40,7 +40,7 @@ fn binding(
     
     actions
         .bind::<Shoot>()
-        .to(Space);
+        .to(Space).to(MouseButton::Left);
 }
 
 fn apply_movement(trigger: Trigger<Fired<Move>>, mut players: Query<&mut Transform, With<Player>>) {
