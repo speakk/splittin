@@ -5,14 +5,14 @@ use avian2d::{math::*, prelude::*};
 use bevy_enhanced_input::actions::Actions;
 
 #[derive(Component)]
-pub struct Ball;
+pub struct StationaryBall;
 
-pub(super) fn ball_plugin(app: &mut App) {
-    app.add_observer(observe_ball_add);
+pub(super) fn stationary_ball_plugin(app: &mut App) {
+    app.add_observer(observe_stationary_ball_add);
 }
 
-fn observe_ball_add(
-    trigger: Trigger<OnAdd, Ball>,
+fn observe_stationary_ball_add(
+    trigger: Trigger<OnAdd, StationaryBall>,
     mut commands: Commands,
     asset_server: Res<AssetServer>,
 ) {
@@ -24,8 +24,7 @@ fn observe_ball_add(
             custom_size: Some(Vec2::splat(ball_radius)),
             ..Default::default()
         },
-        RigidBody::Dynamic,
-        Collider::circle(ball_radius as Scalar),
-        Actions::<PlayerInputContext>::default(),
+        RigidBody::Static,
+        Collider::circle(ball_radius / 14.0 as Scalar),
     ));
 }

@@ -1,7 +1,7 @@
 use std::f32::consts::PI;
-use std::ops::Rem;
 use crate::in_game::player::Player;
 use bevy::prelude::*;
+use bevy::prelude::KeyCode::Space;
 use bevy_enhanced_input::prelude::*;
 
 pub(super) fn input_plugin(app: &mut App) {
@@ -13,6 +13,10 @@ pub(super) fn input_plugin(app: &mut App) {
 #[derive(Debug, InputAction)]
 #[input_action(output = Vec2)]
 struct Move;
+
+#[derive(Debug, InputAction)]
+#[input_action(output = bool)]
+pub(crate) struct Shoot;
 
 #[derive(InputContext)]
 pub struct PlayerInputContext;
@@ -33,6 +37,10 @@ fn binding(
             SmoothNudge::default(),
             Scale::splat(PLAYER_SPEED),
         ));
+    
+    actions
+        .bind::<Shoot>()
+        .to(Space);
 }
 
 fn apply_movement(trigger: Trigger<Fired<Move>>, mut players: Query<&mut Transform, With<Player>>) {
