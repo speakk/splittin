@@ -43,7 +43,6 @@ fn observe_level_ball_add(
 fn react_to_ammo_ball_hitting(
     mut event: EventReader<CollisionStarted>,
     transforms: Query<&Transform>,
-    velocities: Query<&LinearVelocity>,
     collisions: Collisions,
     level_ball: Query<&LevelBall>,
     ammo_ball: Query<(), With<AmmoBall>>,
@@ -89,6 +88,14 @@ fn react_to_ammo_ball_hitting(
             continue;
         }
 
+        // Get the contact pair for these entities
+        let contact_pair = collisions.collisions_with(static_level_ball)
+            .find(|pair| pair.collider1 == colliding_entity || pair.collider2 == colliding_entity);
+        
+        let Some(contact_pair) = contact_pair else {
+            continue;
+        };
+
         let position_1 = transforms.get(colliding_entity).unwrap().translation.truncate();
         let position_2 = transforms.get(static_level_ball).unwrap().translation.truncate();
         
@@ -108,8 +115,33 @@ fn react_to_ammo_ball_hitting(
         let transform = transforms.get(static_level_ball).unwrap();
         let translation = transform.translation;
 
-        let speed = 500.0;
+        // Calculate speed based on contact information
+        let base_speed = 3000.0;
+        let speed = if let Some(manifold) = contact_pair.manifolds.first() {
+            if let Some(contact) = manifold.points.first() {
+                // Use penetration to scale the base speed
+                // The deeper the penetration, the faster the split
+                let penetration_factor = (-contact.penetration / BALL_RADIUS).clamp(0.2, 1.5);
+                
+                // Also factor in the normal impulse, but scale it down significantly
+                // This helps maintain some influence from the collision force
+                let impulse_factor = (contact.normal_impulse / 1000.0).clamp(0.5, 2.0);
+                
+                println!("penetration: {}, penetration_factor: {}", contact.penetration, penetration_factor);
+                println!("normal_impulse: {}, impulse_factor: {}", contact.normal_impulse, impulse_factor);
+                
+                // Combine both factors
+                base_speed * penetration_factor * impulse_factor
+            } else {
+                base_speed
+            }
+        } else {
+            base_speed
+        };
+        
         let gap_between_balls = 3.0;
+        
+        println!("final speed: {}", speed);
         
         commands.spawn((
             LevelBall {
@@ -123,7 +155,7 @@ fn react_to_ammo_ball_hitting(
             LevelBall {
                 static_body: false
             },
-            Transform::from_translation(translation + angle_away_2.extend(0.0) * (BALL_RADIUS + gap_between_balls)),
+            Transform::from_translation(translation + angle_away_2.extend(0.0) * (BALL_RADIUS / 2.0 + gap_between_balls)),
             InitialVelocity(angle_away_2 * speed),
         ));
     }
