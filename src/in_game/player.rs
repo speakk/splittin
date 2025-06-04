@@ -1,11 +1,11 @@
-use crate::in_game::ammo_ball::{AmmoBall, InitialVelocity};
+use crate::in_game::balls::ammo_ball::AmmoBall;
 use crate::in_game::input::{PlayerInputContext, Shoot};
+use avian2d::prelude::ExternalImpulse;
 use bevy::prelude::*;
 use bevy_enhanced_input::events::Started;
 use bevy_enhanced_input::prelude::Actions;
 use std::f32::consts::PI;
-use bevy::color::Color::Srgba;
-use bevy::color::palettes::basic::RED;
+use crate::in_game::balls::initial_velocity::InitialVelocity;
 
 #[derive(Component)]
 pub struct Player;
@@ -24,7 +24,11 @@ fn observe_add_player(
     mut gizmo_assets: ResMut<Assets<GizmoAsset>>,
 ) {
     let mut gizmo = GizmoAsset::default();
-    gizmo.line_2d(Vec2::ZERO, Vec2::new(0.0, -GUN_LENGTH), Color::srgb(0.8, 0.6, 0.4));
+    gizmo.line_2d(
+        Vec2::ZERO,
+        Vec2::new(0.0, -GUN_LENGTH),
+        Color::srgb(0.8, 0.6, 0.4),
+    );
 
     commands.entity(trigger.target()).insert((
         Sprite {
@@ -52,12 +56,14 @@ fn react_to_shoot(
     let transform = transforms.get(trigger.target()).unwrap();
     let position = transform.translation;
     let rotation = transform.rotation.to_euler(EulerRot::XYZ).2 - PI / 2.0;
-    let bullet_speed = 10000.0;
+    let bullet_speed = 13_000.0;
     let initial_velocity = Vec2::from_angle(rotation) * bullet_speed;
 
     commands.spawn((
         AmmoBall,
         InitialVelocity(initial_velocity),
-        Transform::from_translation(position + (Vec2::from_angle(rotation) * GUN_LENGTH).extend(0.0)),
+        Transform::from_translation(
+            position + (Vec2::from_angle(rotation) * GUN_LENGTH).extend(0.0),
+        ),
     ));
 }

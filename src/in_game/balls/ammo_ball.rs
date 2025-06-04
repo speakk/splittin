@@ -6,24 +6,18 @@ use bevy::color::palettes::basic::GREEN;
 use bevy_enhanced_input::actions::Actions;
 
 #[derive(Component)]
-#[require(InitialVelocity = InitialVelocity(Vec2::ZERO))]
 pub struct AmmoBall;
 
-#[derive(Component)]
-pub struct InitialVelocity(pub Vec2);
-
-pub(super) fn ammo_ball_plugin(app: &mut App) {
+pub(in crate::in_game) fn ammo_ball_plugin(app: &mut App) {
     app.add_observer(observe_ammo_ball_add);
 }
 
 fn observe_ammo_ball_add(
     trigger: Trigger<OnAdd, AmmoBall>,
-    initial_velocity: Query<&InitialVelocity>,
     mut commands: Commands,
     asset_server: Res<AssetServer>,
 ) {
     let ball_radius = 30.0;
-    let initial_velocity = initial_velocity.get(trigger.target()).unwrap();
 
     commands.entity(trigger.target()).insert((
         Sprite {
@@ -33,7 +27,8 @@ fn observe_ammo_ball_add(
             ..Default::default()
         },
         RigidBody::Dynamic,
-        ExternalImpulse::new(initial_velocity.0 * 100.0),
-        Collider::circle(ball_radius as Scalar),
+        CollisionEventsEnabled,
+        Mass(32.0),
+        Collider::circle(ball_radius / 2.0 as Scalar),
     ));
 }
