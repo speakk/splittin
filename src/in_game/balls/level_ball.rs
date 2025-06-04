@@ -48,55 +48,72 @@ fn react_to_ammo_ball_hitting(
     mut commands: Commands,
 ) {
     for CollisionStarted(entity1, entity2) in event.read() {
-        
-        
-        let ammo_entity: Option<Entity> = if ammo_ball.contains(*entity1) {
-            Some(*entity1)
-        } else if ammo_ball.contains(*entity2) {
-            Some(*entity2)
-        } else {
-            None
-        };
-
-        let level_ball_entity: Option<Entity> = if level_ball.contains(*entity1) {
-            Some(*entity1)
-        } else if level_ball.contains(*entity2) {
-            Some(*entity2)
-        } else {
-            None
-        };
-
-        if let Some(ammo_ball_entity) = ammo_entity {
-            if let Some(level_ball_entity) = level_ball_entity {
-                let position_1 = transforms.get(ammo_ball_entity).unwrap().translation.truncate();
-                let position_2 = transforms.get(level_ball_entity).unwrap().translation.truncate();
-                let direction = (position_2 - position_1).normalize();
-                let angle_away_1 = Vec2::new(-direction.y, direction.x); // Rotates 90 degrees clockwise
-                let angle_away_2 = Vec2::new(direction.y, -direction.x); // Rotates 90 degrees counter-clockwise
-                commands.entity(level_ball_entity).despawn();
-                commands.entity(ammo_ball_entity).despawn();
-
-                println!("angle away: {:?}", angle_away_1);
-
-                let transform = transforms.get(level_ball_entity).unwrap();
-                let translation = transform.translation;
-
-                commands.spawn((
-                    LevelBall {
-                        static_body: false
-                    },
-                    Transform::from_translation(translation + angle_away_1.extend(0.0) * 15.0),
-                    InitialVelocity(angle_away_1 * 1000.0),
-                ));
-                
-                commands.spawn((
-                    LevelBall {
-                        static_body: false
-                    },
-                    Transform::from_translation(translation + angle_away_2.extend(0.0) * 15.0),
-                    InitialVelocity(angle_away_2 * 1000.0),
-                ));
+        // First, try to find which entity is the static level ball
+        let static_level_ball = if let Ok(ball1) = level_ball.get(*entity1) {
+            if ball1.static_body {
+                Some(*entity1)
+            } else {
+                None
             }
+        } else {
+            None
+        }.or_else(|| {
+            if let Ok(ball2) = level_ball.get(*entity2) {
+                if ball2.static_body {
+                    Some(*entity2)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        });
+
+        // If we didn't find a static level ball, skip this collision
+        let Some(static_level_ball) = static_level_ball else {
+            continue;
+        };
+
+        // The colliding entity is the other one
+        let colliding_entity = if static_level_ball == *entity1 {
+            *entity2
+        } else {
+            *entity1
+        };
+
+        // Verify the colliding entity is either an ammo ball or a non-static level ball
+        if !ammo_ball.contains(colliding_entity) && 
+           !level_ball.get(colliding_entity).map_or(false, |ball| !ball.static_body) {
+            continue;
         }
+
+        let position_1 = transforms.get(colliding_entity).unwrap().translation.truncate();
+        let position_2 = transforms.get(static_level_ball).unwrap().translation.truncate();
+        let direction = (position_2 - position_1).normalize();
+        let angle_away_1 = Vec2::new(-direction.y, direction.x); // Rotates 90 degrees clockwise
+        let angle_away_2 = Vec2::new(direction.y, -direction.x); // Rotates 90 degrees counter-clockwise
+        commands.entity(static_level_ball).try_despawn();
+        commands.entity(colliding_entity).try_despawn();
+
+        println!("angle away: {:?}", angle_away_1);
+
+        let transform = transforms.get(static_level_ball).unwrap();
+        let translation = transform.translation;
+
+        commands.spawn((
+            LevelBall {
+                static_body: false
+            },
+            Transform::from_translation(translation + angle_away_1.extend(0.0) * 15.0),
+            InitialVelocity(angle_away_1 * 1000.0),
+        ));
+        
+        commands.spawn((
+            LevelBall {
+                static_body: false
+            },
+            Transform::from_translation(translation + angle_away_2.extend(0.0) * 15.0),
+            InitialVelocity(angle_away_2 * 1000.0),
+        ));
     }
 }
