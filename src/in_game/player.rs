@@ -2,7 +2,7 @@ use crate::in_game::balls::ammo_ball::AmmoBall;
 use crate::in_game::input::{PlayerInputContext, Shoot, IncreaseForce, DecreaseForce};
 use avian2d::prelude::ExternalImpulse;
 use bevy::prelude::*;
-use bevy_enhanced_input::events::Started;
+use bevy_enhanced_input::events::{Started, Fired};
 use bevy_enhanced_input::prelude::Actions;
 use std::f32::consts::PI;
 use crate::in_game::balls::initial_velocity::InitialVelocity;
@@ -10,6 +10,12 @@ use bevy::window::PrimaryWindow;
 
 #[derive(Component)]
 pub struct Player;
+
+#[derive(Component)]
+struct GunGizmo;
+
+#[derive(Component)]
+struct ForceGizmo;
 
 #[derive(Component)]
 pub struct ShootingForce {
@@ -35,10 +41,13 @@ pub(super) fn player_plugin(app: &mut App) {
         .add_observer(react_to_shoot)
         .add_observer(react_to_increase_force)
         .add_observer(react_to_decrease_force)
-        .add_systems(Update, rotate_player_to_mouse);
+        .add_systems(Update, (rotate_player_to_mouse, update_force_gizmo).chain());
 }
 
 const GUN_LENGTH: f32 = 100.0;
+const FORCE_GIZMO_WIDTH: f32 = 80.0; // This is now the length of the force indicator
+const FORCE_GIZMO_THICKNESS: f32 = 4.0;
+const FORCE_OFFSET: f32 = 10.0; // Distance from gun barrel
 
 fn observe_add_player(
     trigger: Trigger<OnAdd, Player>,
@@ -46,11 +55,18 @@ fn observe_add_player(
     asset_server: Res<AssetServer>,
     mut gizmo_assets: ResMut<Assets<GizmoAsset>>,
 ) {
-    let mut gizmo = GizmoAsset::default();
-    gizmo.line_2d(
+    let mut gun_gizmo = GizmoAsset::default();
+    gun_gizmo.line_2d(
         Vec2::ZERO,
         Vec2::new(0.0, -GUN_LENGTH),
         Color::srgb(0.8, 0.6, 0.4),
+    );
+
+    let mut force_gizmo = GizmoAsset::default();
+    force_gizmo.line_2d(
+        Vec2::new(FORCE_OFFSET, 0.0), // Start point offset from gun
+        Vec2::new(FORCE_OFFSET, -FORCE_GIZMO_WIDTH), // End point parallel to gun
+        Color::srgb(0.0, 1.0, 1.0), // Cyan color
     );
 
     commands.entity(trigger.target()).insert((
@@ -61,14 +77,32 @@ fn observe_add_player(
         },
         Actions::<PlayerInputContext>::default(),
         ShootingForce::default(),
-        children![Gizmo {
-            handle: gizmo_assets.add(gizmo),
-            line_config: GizmoLineConfig {
-                width: 20.0,
-                ..Default::default()
-            },
-            ..Default::default()
-        }],
+        children![
+            // Gun gizmo
+            (
+                Gizmo {
+                    handle: gizmo_assets.add(gun_gizmo),
+                    line_config: GizmoLineConfig {
+                        width: 20.0,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+                GunGizmo,
+            ),
+            // Force indicator gizmo
+            (
+                Gizmo {
+                    handle: gizmo_assets.add(force_gizmo),
+                    line_config: GizmoLineConfig {
+                        width: FORCE_GIZMO_THICKNESS,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+                ForceGizmo,
+            ),
+        ],
     ));
 }
 
@@ -128,7 +162,7 @@ fn rotate_player_to_mouse(
 }
 
 fn react_to_increase_force(
-    trigger: Trigger<Started<IncreaseForce>>,
+    trigger: Trigger<Fired<IncreaseForce>>,
     mut forces: Query<&mut ShootingForce>,
 ) {
     if let Ok(mut force) = forces.get_mut(trigger.target()) {
@@ -137,10 +171,44 @@ fn react_to_increase_force(
 }
 
 fn react_to_decrease_force(
-    trigger: Trigger<Started<DecreaseForce>>,
+    trigger: Trigger<Fired<DecreaseForce>>,
     mut forces: Query<&mut ShootingForce>,
 ) {
     if let Ok(mut force) = forces.get_mut(trigger.target()) {
         force.value = (force.value - force.step).max(force.min);
+    }
+}
+
+fn update_force_gizmo(
+    force_query: Query<&ShootingForce>,
+    mut gizmos: Query<(&mut Transform, &Gizmo), With<ForceGizmo>>,
+    mut gizmo_assets: ResMut<Assets<GizmoAsset>>,
+) {
+    for force in force_query.iter() {
+        for (mut transform, gizmo) in gizmos.iter_mut() {
+            // Calculate force percentage and scale
+            let force_percent = (force.value - force.min) / (force.max - force.min);
+            // Ensure minimum scale of 0.2 (20%) for visibility
+            let scale = 0.2 + (force_percent * 0.8);
+            
+            // Update transform scale for Y axis only
+            transform.scale.y = scale;
+
+            // Update gizmo color based on force
+            let mut gizmo_asset = GizmoAsset::default();
+            let color = Color::srgb(
+                force_percent.min(1.0), // More red as force increases
+                (1.0 - force_percent).max(0.0), // More green as force decreases
+                1.0, // Keep blue constant for visibility
+            );
+            gizmo_asset.line_2d(
+                Vec2::new(FORCE_OFFSET, 0.0),
+                Vec2::new(FORCE_OFFSET, -FORCE_GIZMO_WIDTH),
+                color,
+            );
+            if let Some(asset) = gizmo_assets.get_mut(&gizmo.handle) {
+                *asset = gizmo_asset;
+            }
+        }
     }
 }
