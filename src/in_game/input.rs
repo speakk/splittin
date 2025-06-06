@@ -18,6 +18,14 @@ struct Move;
 #[input_action(output = bool)]
 pub(crate) struct Shoot;
 
+#[derive(Debug, InputAction)]
+#[input_action(output = bool)]
+pub(crate) struct IncreaseForce;
+
+#[derive(Debug, InputAction)]
+#[input_action(output = bool)]
+pub(crate) struct DecreaseForce;
+
 #[derive(InputContext)]
 pub struct PlayerInputContext;
 
@@ -41,6 +49,14 @@ fn binding(
     actions
         .bind::<Shoot>()
         .to(Space).to(MouseButton::Left);
+
+    actions
+        .bind::<IncreaseForce>()
+        .to(KeyCode::KeyE);
+
+    actions
+        .bind::<DecreaseForce>()
+        .to(KeyCode::KeyQ);
 }
 
 fn apply_movement(trigger: Trigger<Fired<Move>>, mut players: Query<&mut Transform, With<Player>>) {

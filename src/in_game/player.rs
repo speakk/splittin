@@ -1,5 +1,5 @@
 use crate::in_game::balls::ammo_ball::AmmoBall;
-use crate::in_game::input::{PlayerInputContext, Shoot};
+use crate::in_game::input::{PlayerInputContext, Shoot, IncreaseForce, DecreaseForce};
 use avian2d::prelude::ExternalImpulse;
 use bevy::prelude::*;
 use bevy_enhanced_input::events::Started;
@@ -11,9 +11,30 @@ use bevy::window::PrimaryWindow;
 #[derive(Component)]
 pub struct Player;
 
+#[derive(Component)]
+pub struct ShootingForce {
+    value: f32,
+    min: f32,
+    max: f32,
+    step: f32,
+}
+
+impl Default for ShootingForce {
+    fn default() -> Self {
+        Self {
+            value: 13_000.0, // Default bullet speed
+            min: 5_000.0,
+            max: 20_000.0,
+            step: 1_000.0,
+        }
+    }
+}
+
 pub(super) fn player_plugin(app: &mut App) {
-    app.add_observer(observe_add_player);
-    app.add_observer(react_to_shoot)
+    app.add_observer(observe_add_player)
+        .add_observer(react_to_shoot)
+        .add_observer(react_to_increase_force)
+        .add_observer(react_to_decrease_force)
         .add_systems(Update, rotate_player_to_mouse);
 }
 
@@ -39,6 +60,7 @@ fn observe_add_player(
             ..Default::default()
         },
         Actions::<PlayerInputContext>::default(),
+        ShootingForce::default(),
         children![Gizmo {
             handle: gizmo_assets.add(gizmo),
             line_config: GizmoLineConfig {
@@ -54,12 +76,13 @@ fn react_to_shoot(
     trigger: Trigger<Started<Shoot>>,
     mut commands: Commands,
     transforms: Query<&Transform>,
+    forces: Query<&ShootingForce>,
 ) {
     let transform = transforms.get(trigger.target()).unwrap();
     let position = transform.translation;
     let rotation = transform.rotation.to_euler(EulerRot::XYZ).2 - PI / 2.0;
-    let bullet_speed = 13_000.0;
-    let initial_velocity = Vec2::from_angle(rotation) * bullet_speed;
+    let force = forces.get(trigger.target()).unwrap();
+    let initial_velocity = Vec2::from_angle(rotation) * force.value;
 
     commands.spawn((
         AmmoBall,
@@ -101,5 +124,23 @@ fn rotate_player_to_mouse(
         let direction = world_position - player_pos;
         let angle = direction.y.atan2(direction.x) + PI / 2.0;
         transform.rotation = Quat::from_rotation_z(angle);
+    }
+}
+
+fn react_to_increase_force(
+    trigger: Trigger<Started<IncreaseForce>>,
+    mut forces: Query<&mut ShootingForce>,
+) {
+    if let Ok(mut force) = forces.get_mut(trigger.target()) {
+        force.value = (force.value + force.step).min(force.max);
+    }
+}
+
+fn react_to_decrease_force(
+    trigger: Trigger<Started<DecreaseForce>>,
+    mut forces: Query<&mut ShootingForce>,
+) {
+    if let Ok(mut force) = forces.get_mut(trigger.target()) {
+        force.value = (force.value - force.step).max(force.min);
     }
 }
