@@ -8,6 +8,7 @@ bevy = { version = "0.16.1", features = ["flac"] }
 bevy_enhanced_input = "0.12.0"
 avian2d = "0.3"
 bevy_hanabi = "0.16.0"
+rand = "0.9.1"
 
 # Enable a small amount of optimization in the dev profile.
 [profile.dev]
