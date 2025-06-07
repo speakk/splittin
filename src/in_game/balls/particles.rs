@@ -5,7 +5,7 @@ use avian2d::prelude::*;
 pub(in crate::in_game) fn particles_plugin(app: &mut App) {
     app.add_plugins(HanabiPlugin)
         .add_systems(Startup, setup_particle_effects)
-        .add_systems(Update, spawn_collision_particles);
+        .add_systems(Update, (spawn_collision_particles, cleanup_finished_effects));
 }
 
 fn setup_particle_effects(mut commands: Commands, mut effects: ResMut<Assets<EffectAsset>>) {
@@ -77,7 +77,26 @@ fn spawn_collision_particles(
             commands.spawn((
                 ParticleEffect::new(effect_template.0.clone()),
                 Transform::from_translation(collision_pos),
+                // Add a component to track when this effect should be cleaned up
+                CleanupAfter(Timer::from_seconds(0.6, TimerMode::Once)), // slightly longer than particle lifetime
             ));
+        }
+    }
+}
+
+// Component to track when to clean up the effect
+#[derive(Component)]
+struct CleanupAfter(Timer);
+
+fn cleanup_finished_effects(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut query: Query<(Entity, &mut CleanupAfter)>,
+) {
+    for (entity, mut cleanup_timer) in query.iter_mut() {
+        cleanup_timer.0.tick(time.delta());
+        if cleanup_timer.0.finished() {
+            commands.entity(entity).despawn();
         }
     }
 } 
