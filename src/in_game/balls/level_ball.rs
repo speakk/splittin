@@ -2,32 +2,15 @@ use crate::in_game::balls::ammo_ball::AmmoBall;
 use avian2d::{math::*, prelude::*};
 use bevy::prelude::*;
 use crate::in_game::balls::initial_velocity::InitialVelocity;
+use crate::in_game::balls::ammo_ball::SplitChain;
 
 #[derive(Component)]
 pub struct LevelBall {
     pub static_body: bool,
 }
 
-// Tracks which ammo ball caused this chain reaction
-#[derive(Component, Clone)]
-pub struct SplitChain {
-    pub ammo_id: u32,
-}
-
-// Resource to generate unique IDs for ammo balls
-#[derive(Resource)]
-struct NextAmmoId(u32);
-
-impl Default for NextAmmoId {
-    fn default() -> Self {
-        Self(1) // Start from 1, 0 could be used to mean "no chain"
-    }
-}
-
 pub(in crate::in_game) fn level_ball_plugin(app: &mut App) {
-    app.init_resource::<NextAmmoId>()
-        .add_observer(observe_level_ball_add)
-        .add_observer(observe_ammo_ball_add)
+    app.add_observer(observe_level_ball_add)
         .add_systems(Update, react_to_ammo_ball_hitting);
 }
 
@@ -56,18 +39,6 @@ fn observe_level_ball_add(
             RigidBody::Dynamic
         }
     ));
-}
-
-// When an ammo ball is added, give it a unique ID
-fn observe_ammo_ball_add(
-    trigger: Trigger<OnAdd, AmmoBall>,
-    mut next_id: ResMut<NextAmmoId>,
-    mut commands: Commands,
-) {
-    commands.entity(trigger.target()).insert(SplitChain {
-        ammo_id: next_id.0,
-    });
-    next_id.0 += 1;
 }
 
 fn react_to_ammo_ball_hitting(

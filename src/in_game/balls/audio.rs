@@ -1,7 +1,8 @@
 use bevy::prelude::*;
 use avian2d::prelude::*;
 use rand::Rng;
-use crate::in_game::balls::level_ball::{LevelBall, SplitChain};
+use crate::in_game::balls::level_ball::{LevelBall};
+use crate::in_game::balls::ammo_ball::{SplitChain, AmmoBall};
 
 // Configuration for the collision sound
 #[derive(Resource)]
@@ -57,7 +58,8 @@ fn play_collision_sound(
     asset_server: Res<AssetServer>,
     config: Res<CollisionSoundConfig>,
     mut commands: Commands,
-    split_chains: Query<(&LevelBall, &SplitChain)>,
+    split_chains: Query<&SplitChain>,
+    level_balls: Query<&LevelBall>,
     mut active_count: ResMut<ActiveSoundCount>,
 ) {
     let mut rng = rand::rng();
@@ -69,9 +71,9 @@ fn play_collision_sound(
         }
 
         // Try to get the chain ID from either entity in the collision
-        let chain_id = if let Ok((_, chain)) = split_chains.get(*entity1) {
+        let chain_id = if let Ok(chain) = split_chains.get(*entity1) {
             Some(chain.ammo_id)
-        } else if let Ok((_, chain)) = split_chains.get(*entity2) {
+        } else if let Ok(chain) = split_chains.get(*entity2) {
             Some(chain.ammo_id)
         } else {
             None
@@ -81,7 +83,7 @@ fn play_collision_sound(
             // Count how many dynamic balls are in this chain
             let chain_count = split_chains
                 .iter()
-                .filter(|(ball, chain)| !ball.static_body && chain.ammo_id == chain_id)
+                .filter(|chain| chain.ammo_id == chain_id)
                 .count();
 
             // Calculate pitch based on chain count
