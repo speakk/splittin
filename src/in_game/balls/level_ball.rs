@@ -8,9 +8,27 @@ pub struct LevelBall {
     pub static_body: bool,
 }
 
+// Tracks which ammo ball caused this chain reaction
+#[derive(Component, Clone)]
+pub struct SplitChain {
+    pub ammo_id: u32,
+}
+
+// Resource to generate unique IDs for ammo balls
+#[derive(Resource)]
+struct NextAmmoId(u32);
+
+impl Default for NextAmmoId {
+    fn default() -> Self {
+        Self(1) // Start from 1, 0 could be used to mean "no chain"
+    }
+}
+
 pub(in crate::in_game) fn level_ball_plugin(app: &mut App) {
-    app.add_observer(observe_level_ball_add);
-    app.add_systems(Update, react_to_ammo_ball_hitting);
+    app.init_resource::<NextAmmoId>()
+        .add_observer(observe_level_ball_add)
+        .add_observer(observe_ammo_ball_add)
+        .add_systems(Update, react_to_ammo_ball_hitting);
 }
 
 const BALL_RADIUS: f32 = 30.0;
@@ -40,11 +58,24 @@ fn observe_level_ball_add(
     ));
 }
 
+// When an ammo ball is added, give it a unique ID
+fn observe_ammo_ball_add(
+    trigger: Trigger<OnAdd, AmmoBall>,
+    mut next_id: ResMut<NextAmmoId>,
+    mut commands: Commands,
+) {
+    commands.entity(trigger.target()).insert(SplitChain {
+        ammo_id: next_id.0,
+    });
+    next_id.0 += 1;
+}
+
 fn react_to_ammo_ball_hitting(
     mut event: EventReader<CollisionStarted>,
     transforms: Query<&Transform>,
     collisions: Collisions,
     level_ball: Query<&LevelBall>,
+    split_chains: Query<&SplitChain>,
     ammo_ball: Query<(), With<AmmoBall>>,
     mut commands: Commands,
 ) {
@@ -80,6 +111,15 @@ fn react_to_ammo_ball_hitting(
             *entity2
         } else {
             *entity1
+        };
+
+        // Get the split chain from the colliding entity if it exists
+        let split_chain = if ammo_ball.contains(colliding_entity) {
+            // If it's an ammo ball, get its ID directly
+            split_chains.get(colliding_entity).ok().map(|chain| chain.clone())
+        } else {
+            // If it's a level ball with a chain, use that
+            split_chains.get(colliding_entity).ok().map(|chain| chain.clone())
         };
 
         // Verify the colliding entity is either an ammo ball or a non-static level ball
@@ -142,21 +182,24 @@ fn react_to_ammo_ball_hitting(
         let gap_between_balls = 3.0;
         
         println!("final speed: {}", speed);
+
+        // Create the new split balls, propagating the split chain if it exists
+        let mut spawn_ball = |angle: Vec2| {
+            let mut entity_commands = commands.spawn((
+                LevelBall {
+                    static_body: false
+                },
+                Transform::from_translation(translation + angle.extend(0.0) * (BALL_RADIUS / 2.0 + gap_between_balls)),
+                InitialVelocity(angle * speed),
+            ));
+
+            // If this split was caused by a chain reaction, propagate it
+            if let Some(chain) = &split_chain {
+                entity_commands.insert(chain.clone());
+            }
+        };
         
-        commands.spawn((
-            LevelBall {
-                static_body: false
-            },
-            Transform::from_translation(translation + angle_away_1.extend(0.0) * (BALL_RADIUS / 2.0 + gap_between_balls)),
-            InitialVelocity(angle_away_1 * speed),
-        ));
-        
-        commands.spawn((
-            LevelBall {
-                static_body: false
-            },
-            Transform::from_translation(translation + angle_away_2.extend(0.0) * (BALL_RADIUS / 2.0 + gap_between_balls)),
-            InitialVelocity(angle_away_2 * speed),
-        ));
+        spawn_ball(angle_away_1);
+        spawn_ball(angle_away_2);
     }
 }
