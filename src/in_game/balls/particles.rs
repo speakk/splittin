@@ -11,9 +11,9 @@ pub(in crate::in_game) fn particles_plugin(app: &mut App) {
 fn setup_particle_effects(mut commands: Commands, mut effects: ResMut<Assets<EffectAsset>>) {
     // Create a new effect asset
     let mut gradient = Gradient::new();
-    gradient.add_key(0.0, Vec4::new(1.0, 0.8, 0.3, 1.0));  // Bright yellow
-    gradient.add_key(0.5, Vec4::new(1.0, 0.4, 0.0, 0.8));  // Orange
-    gradient.add_key(1.0, Vec4::new(0.5, 0.0, 0.0, 0.0));  // Fade to transparent red
+    gradient.add_key(0.0, Vec4::new(0.9, 1.0, 0.4, 1.0));  // Bright yellow
+    gradient.add_key(0.5, Vec4::new(0.9, 0.7, 0.0, 0.8));  // Orange
+    gradient.add_key(1.0, Vec4::new(0.6, 0.7, 0.0, 0.0));  // Fade to transparent red
 
     // Create a new expression module
     let mut module = Module::default();
@@ -36,12 +36,12 @@ fn setup_particle_effects(mut commands: Commands, mut effects: ResMut<Assets<Eff
     let init_lifetime = SetAttributeModifier::new(Attribute::LIFETIME, lifetime);
 
     // Set particle size
-    let size = module.lit(5.0);
+    let size = module.lit(13.0);
     let init_size = SetAttributeModifier::new(Attribute::SIZE, size);
 
     let effect = EffectAsset::new(
         32,  // Maximum number of particles
-        SpawnerSettings::once(20.0.into()),  // Spawn 20 particles immediately
+        SpawnerSettings::once(10.0.into()),  // Spawn 20 particles immediately
         module,
     )
     .with_name("collision_effect")
