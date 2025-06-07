@@ -22,18 +22,20 @@ pub(super) fn in_game_plugin(app: &mut App) {
     app.add_systems(Startup, start_level);
 }
 
-fn start_level(mut commands: Commands) {
-    commands.spawn((Player, Transform::from_xyz(0.0, 200.0, 0.0)));
+fn start_level(
+    mut commands: Commands,
+) {
+    commands.spawn((Player, Transform::from_xyz(0.0, 750.0, 0.0)));
 
-    let rows = 5;
-    let balls_per_row = 10;
-    let ball_spacing = 100.0;
-    let row_spacing = 100.0;
+    let rows = 17;
+    let balls_per_row = 40;
+    let ball_spacing = 80.0;
+    let row_spacing = 80.0;
 
     for row in 0..rows {
         for i in 0..balls_per_row {
             let x = (i as f32 - (balls_per_row - 1) as f32 / 2.0) * ball_spacing;
-            let y = row as f32 * row_spacing;
+            let y = (row as f32 - (rows - 1) as f32 / 2.0) * row_spacing + 100.0;
             commands.spawn((
                 LevelBall {
                     static_body: true
