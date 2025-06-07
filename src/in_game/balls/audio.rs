@@ -14,6 +14,8 @@ pub struct CollisionSoundConfig {
     pub pitch_per_ball: f32,
     /// Maximum pitch multiplier regardless of ball count
     pub max_pitch: f32,
+    /// Maximum number of simultaneous collision sounds
+    pub max_simultaneous_sounds: usize,
 }
 
 impl Default for CollisionSoundConfig {
@@ -23,13 +25,31 @@ impl Default for CollisionSoundConfig {
             speed_variation: 0.1,
             pitch_per_ball: 0.06,
             max_pitch: 2.5,
+            max_simultaneous_sounds: 8,
         }
     }
 }
 
+#[derive(Resource, Default)]
+struct ActiveSoundCount(usize);
+
 pub(in crate::in_game) fn audio_plugin(app: &mut App) {
     app.init_resource::<CollisionSoundConfig>()
-        .add_systems(Update, play_collision_sound);
+        .init_resource::<ActiveSoundCount>()
+        .add_systems(Update, (play_collision_sound, cleanup_finished_sounds));
+}
+
+fn cleanup_finished_sounds(
+    mut commands: Commands,
+    sinks: Query<(Entity, &AudioSink)>,
+    mut active_count: ResMut<ActiveSoundCount>,
+) {
+    for (entity, sink) in sinks.iter() {
+        if sink.empty() {
+            commands.entity(entity).despawn();
+            active_count.0 = active_count.0.saturating_sub(1);
+        }
+    }
 }
 
 fn play_collision_sound(
@@ -38,10 +58,16 @@ fn play_collision_sound(
     config: Res<CollisionSoundConfig>,
     mut commands: Commands,
     split_chains: Query<(&LevelBall, &SplitChain)>,
+    mut active_count: ResMut<ActiveSoundCount>,
 ) {
     let mut rng = rand::rng();
 
     for CollisionStarted(entity1, entity2) in collision_events.read() {
+        // Skip if we've reached the maximum number of simultaneous sounds
+        if active_count.0 >= config.max_simultaneous_sounds {
+            continue;
+        }
+
         // Try to get the chain ID from either entity in the collision
         let chain_id = if let Ok((_, chain)) = split_chains.get(*entity1) {
             Some(chain.ammo_id)
@@ -66,14 +92,16 @@ fn play_collision_sound(
             let variation = rng.random_range(-config.speed_variation..=config.speed_variation);
             let final_pitch = pitch * (1.0 + variation);
 
-            // Spawn a new entity with an AudioPlayer that will play once and then despawn
+            // Spawn a new entity with an AudioPlayer that will play once
             commands.spawn((
                 AudioPlayer::new(asset_server.load("sounds/ball_hit.flac")),
                 PlaybackSettings {
                     speed: final_pitch,
-                    ..PlaybackSettings::DESPAWN
+                    ..PlaybackSettings::ONCE // Just play once, we'll handle despawning ourselves
                 },
             ));
+
+            active_count.0 += 1;
         }
     }
 } 
