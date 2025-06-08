@@ -27,10 +27,10 @@ fn start_level(
 ) {
     commands.spawn((Player, Transform::from_xyz(0.0, 750.0, 0.0)));
 
-    let rows = 17;
+    let rows = 3;
     let balls_per_row = 40;
     let ball_spacing = 80.0;
-    let row_spacing = 80.0;
+    let row_spacing = 380.0;
 
     for row in 0..rows {
         for i in 0..balls_per_row {

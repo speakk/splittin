@@ -9,8 +9,12 @@ pub struct LevelBall {
     pub static_body: bool,
 }
 
+#[derive(Component)]
+pub struct PreviousVelocity(pub Vec2);
+
 pub(in crate::in_game) fn level_ball_plugin(app: &mut App) {
     app.add_observer(observe_level_ball_add)
+        .add_systems(FixedPreUpdate, update_previous_velocity)
         .add_systems(Update, react_to_ammo_ball_hitting);
 }
 
@@ -33,12 +37,21 @@ fn observe_level_ball_add(
         Collider::circle(BALL_RADIUS / 2.0 as Scalar),
         CollisionEventsEnabled,
         Mass(6.0),
+        PreviousVelocity(Vec2::ZERO),
         if level_ball.static_body {
             RigidBody::Static
         } else {
             RigidBody::Dynamic
         }
     ));
+}
+
+fn update_previous_velocity(
+    mut query: Query<(&LinearVelocity, &mut PreviousVelocity)>,
+) {
+    for (velocity, mut prev_velocity) in query.iter_mut() {
+        prev_velocity.0 = velocity.0;
+    }
 }
 
 fn react_to_ammo_ball_hitting(
@@ -48,6 +61,7 @@ fn react_to_ammo_ball_hitting(
     level_ball: Query<&LevelBall>,
     split_chains: Query<&SplitChain>,
     ammo_ball: Query<(), With<AmmoBall>>,
+    velocities: Query<&PreviousVelocity>,
     mut commands: Commands,
 ) {
     for CollisionStarted(entity1, entity2) in event.read() {
@@ -99,14 +113,6 @@ fn react_to_ammo_ball_hitting(
             continue;
         }
 
-        // Get the contact pair for these entities
-        let contact_pair = collisions.collisions_with(static_level_ball)
-            .find(|pair| pair.collider1 == colliding_entity || pair.collider2 == colliding_entity);
-        
-        let Some(contact_pair) = contact_pair else {
-            continue;
-        };
-
         let position_1 = transforms.get(colliding_entity).unwrap().translation.truncate();
         let position_2 = transforms.get(static_level_ball).unwrap().translation.truncate();
         
@@ -126,26 +132,16 @@ fn react_to_ammo_ball_hitting(
         let transform = transforms.get(static_level_ball).unwrap();
         let translation = transform.translation;
 
-        // Calculate speed based on contact information
-        let base_speed = 3000.0;
-        let speed = if let Some(manifold) = contact_pair.manifolds.first() {
-            if let Some(contact) = manifold.points.first() {
-                // Use penetration to scale the base speed
-                // The deeper the penetration, the faster the split
-                let penetration_factor = (-contact.penetration / BALL_RADIUS).clamp(0.2, 1.5);
-                
-                // Also factor in the normal impulse, but scale it down significantly
-                // This helps maintain some influence from the collision force
-                let impulse_factor = (contact.normal_impulse / 1000.0).clamp(0.5, 2.0);
-                
-                println!("penetration: {}, penetration_factor: {}", contact.penetration, penetration_factor);
-                println!("normal_impulse: {}, impulse_factor: {}", contact.normal_impulse, impulse_factor);
-                
-                // Combine both factors
-                base_speed * penetration_factor * impulse_factor
-            } else {
-                base_speed
-            }
+        // Calculate speed based on the colliding entity's previous velocity
+        let base_speed = 500.0;
+        let speed = if let Ok(velocity) = velocities.get(colliding_entity) {
+            let velocity_magnitude = velocity.0.length();
+            println!("previous velocity: {:?}, magnitude: {}", velocity.0, velocity_magnitude);
+            
+            // Scale the velocity magnitude to get a reasonable split speed
+            // We want faster incoming balls to create faster splits
+            let velocity_factor = (velocity_magnitude / 200.0).clamp(0.5, 5.0);
+            base_speed * velocity_factor
         } else {
             base_speed
         };

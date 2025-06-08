@@ -30,7 +30,7 @@ impl Default for ShootingForce {
         Self {
             value: 13_000.0, // Default bullet speed
             min: 5_000.0,
-            max: 20_000.0,
+            max: 100_000.0,
             step: 1_000.0,
         }
     }

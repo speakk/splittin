@@ -1,3 +1,4 @@
+use crate::in_game::balls::level_ball::PreviousVelocity;
 use crate::in_game::input::PlayerInputContext;
 use bevy::prelude::*;
 use avian2d::{math::*, prelude::*};
@@ -52,6 +53,7 @@ fn observe_ammo_ball_add(
         SplitChain {
             ammo_id: next_id.0,
         },
+        PreviousVelocity(Vec2::ZERO),
     ));
     
     next_id.0 += 1;
