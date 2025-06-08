@@ -35,6 +35,10 @@ fn observe_level_ball_add(
             ..Default::default()
         },
         Collider::circle(BALL_RADIUS / 2.0 as Scalar),
+        Restitution {
+            coefficient: 1.0,
+            ..Default::default()
+        },
         CollisionEventsEnabled,
         Mass(6.0),
         PreviousVelocity(Vec2::ZERO),
@@ -57,7 +61,6 @@ fn update_previous_velocity(
 fn react_to_ammo_ball_hitting(
     mut event: EventReader<CollisionStarted>,
     transforms: Query<&Transform>,
-    collisions: Collisions,
     level_ball: Query<&LevelBall>,
     split_chains: Query<&SplitChain>,
     ammo_ball: Query<(), With<AmmoBall>>,

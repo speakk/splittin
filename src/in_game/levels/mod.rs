@@ -232,6 +232,10 @@ fn spawn_collision_body(commands: &mut Commands, points: Vec<Vec2>) {
         commands.spawn((
             RigidBody::Static,
             Collider::trimesh(vertices, indices),
+            Restitution {
+                coefficient: 0.5,
+                ..Default::default()
+            },
             LevelCollider,
         ));
     } else {

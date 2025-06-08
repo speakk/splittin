@@ -54,6 +54,10 @@ fn observe_ammo_ball_add(
             ammo_id: next_id.0,
         },
         PreviousVelocity(Vec2::ZERO),
+        Restitution {
+            coefficient: 1.0,
+            ..Default::default()
+        },
     ));
     
     next_id.0 += 1;
