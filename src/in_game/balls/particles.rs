@@ -66,20 +66,31 @@ fn spawn_collision_particles(
     mut commands: Commands,
     mut collision_events: EventReader<CollisionStarted>,
     effect_template: Res<CollisionEffectTemplate>,
-    transforms: Query<&Transform>,
+    contacts: Collisions,
+    transforms: Query<&GlobalTransform>,
 ) {
     for CollisionStarted(entity1, entity2) in collision_events.read() {
-        // Get the collision position (average of both entities' positions)
-        if let (Ok(transform1), Ok(transform2)) = (transforms.get(*entity1), transforms.get(*entity2)) {
-            let collision_pos = (transform1.translation + transform2.translation) / 2.0;
-            
-            // Spawn a new particle effect at the collision point
-            commands.spawn((
-                ParticleEffect::new(effect_template.0.clone()),
-                Transform::from_translation(collision_pos),
-                // Add a component to track when this effect should be cleaned up
-                CleanupAfter(Timer::from_seconds(0.6, TimerMode::Once)), // slightly longer than particle lifetime
-            ));
+        // Get the contact pair between the two entities
+        if let Some(contact_pair) = contacts.get(*entity1, *entity2) {
+            // For each contact manifold between the colliders
+            for manifold in contact_pair.manifolds.iter() {
+                // For each contact point in the manifold
+                for contact in manifold.points.iter() {
+                    // Get the transform of the first entity to convert local point to world space
+                    if let Ok(global_transform) = transforms.get(*entity1) {
+                        // Convert local point to world space
+                        let world_point = global_transform.transform_point(contact.local_point1.extend(0.0));
+                        
+                        // Spawn a new particle effect at the world space contact point
+                        commands.spawn((
+                            ParticleEffect::new(effect_template.0.clone()),
+                            Transform::from_translation(world_point),
+                            // Add a component to track when this effect should be cleaned up
+                            CleanupAfter(Timer::from_seconds(0.6, TimerMode::Once)), // slightly longer than particle lifetime
+                        ));
+                    }
+                }
+            }
         }
     }
 }
