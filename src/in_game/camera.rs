@@ -9,7 +9,7 @@ pub(super) fn camera_plugin(app: &mut App) {
                 ..default()
             },
             Projection::Orthographic(OrthographicProjection {
-                scale: 2.0,
+                scaling_mode: bevy::render::camera::ScalingMode::FixedVertical { viewport_height: 1200.0 },
                 ..OrthographicProjection::default_2d()
             }),
         ));
